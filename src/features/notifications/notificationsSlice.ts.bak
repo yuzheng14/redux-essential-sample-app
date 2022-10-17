@@ -1,0 +1,58 @@
+import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { client } from "../../api/client";
+import { RootState } from "../../app/store";
+
+export interface Notification {
+    date: string,
+    user: string,
+    id: string,
+    message: string,
+    read: boolean,
+    isNew: boolean,
+}
+
+export type Notifacations = Array<Notification>;
+
+export const fetchNotifications = createAsyncThunk(
+    'notifications/fetchNotifications',
+    async (_, { getState }) => {
+        const allNotifications = selectAllNotifications(getState())
+        const [latestNotification] = allNotifications
+        console.log(latestNotification);
+
+        const latestTimestamp = latestNotification ? latestNotification.date : ''
+        const response = await client.get(
+            `/fakeApi/notifications?since=${latestTimestamp}`
+        )
+        return response.data
+    }
+)
+
+const initialState = [] as Notifacations
+
+const notificationsSlice = createSlice({
+    name: 'notifications',
+    initialState,
+    reducers: {
+        allNotificationsRead(state, action: PayloadAction<null>) {
+            state.forEach(notification => {
+                notification.read = true
+            })
+        }
+    },
+    extraReducers: {
+        [fetchNotifications.fulfilled]: (state, action) => {
+            state.forEach(notification => {
+                notification.isNew = !notification.read
+            })
+            state.push(...action.payload)
+            state.sort((a, b) => b.date.localeCompare(a.date))
+        }
+    }
+})
+
+export default notificationsSlice.reducer
+
+export const { allNotificationsRead } = notificationsSlice.actions
+
+export const selectAllNotifications = (state: RootState) => state.notifications
